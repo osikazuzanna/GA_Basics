@@ -5,24 +5,16 @@ from numpy.random import rand, randint
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import min, sum, ptp, array
-from sklearn.linear_model import LinearRegression, SGDRegressor #To retrain the surrogate model I used inceremental learning, since we want to keep some knowledge in each generation
+from sklearn.linear_model import LinearRegression, 
 from sklearn.ensemble import RandomForestRegressor
 import statsmodels.api as sm
 import pandas as pd
 import sklearn.ensemble
+import statistics
 
 
 
 
-#Parameters
-
-bounds = [[-10, 10], [-10, 10]]
-iteration = 200
-bits_per_var = 20
-n_var = 2
-pop_size = 100
-crossover_rate = 0.7
-mutation_rate = 0.3
 
 #---------------------------------------------------------------------------
 
@@ -36,6 +28,7 @@ class Binary_GA:
 # @param pop_size refers to a population size in each generation
 # @param crossover_rate is a probability of crossover
 # @param mutation_rate is a mutation rate
+# @param surrogate is a surrogate function to train to obtain variable performance
 
     def __init__(self, bounds, iteration, bits_per_var, n_var, pop_size, crossover_rate, mutation_rate, surrogate = None):
         self.bounds = bounds
@@ -160,7 +153,7 @@ class Binary_GA:
                     pop = self.selection(joint_pop, fitness)
                 else:
                     fitness = surrogate_function.predict(real_chromosome)
-                    index = np.argmax(fitness)
+                    index = np.argmax(fitness) 
                     best_solution_encoded.append(real_chromosome[index])
                     best_solution_genotype.append(joint_pop[index])
                     best_fitness.append(1/max(fitness) - 1)
@@ -200,7 +193,13 @@ class Binary_GA:
                 importance.append(change_i)
 
             cumulated_importance.append(importance)
-        return pert_solution, cumulated_importance
+
+        final_importance = []
+        for i in range(self.n_var):
+            vi_importance = statistics.median([imp[i] for imp in cumulated_importance])
+            final_importance.append(vi_importance)
+
+        return pert_solution, cumulated_importance, final_importance
 
 
 
@@ -211,30 +210,7 @@ class Binary_GA:
 
 
 
-#----------------------------------------------------------
-#Initial population
 
-if __name__ == '__main__':
-    #parameters
-    bounds = [[-10, 10], [-10, 10]]
-    iteration = 100
-    bits_per_var = 20
-    n_var = 2
-    pop_size = 100
-    crossover_rate = 0.7
-    mutation_rate = 0.2
-    # print('Min objective funtion value')
-    # print('Optimal solution', decoding(bounds, bits_per_var, current_best))
-    ga = Binary_GA(bounds, iteration, bits_per_var, n_var, pop_size, crossover_rate, mutation_rate, surrogate = 'RandomForest')
-    fitness, phenotype, genotype, surrogate = ga.solve()
-    pert_solution, cumulated_importance = ga.importance(n_explain = 3)
-    print(pert_solution)
-    print(cumulated_importance)
-    fig = plt.figure()
-    plt.plot(fitness)
-    plt.xlabel('Iteration')
-    plt.ylabel('Objective function value')
-    plt.show()
 
 
 
