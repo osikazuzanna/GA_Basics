@@ -3,7 +3,7 @@ from numpy.random import rand, randint
 import random
 import pandas as pd
 import statistics
-
+import statistics
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import make_classification
 from sklearn.metrics import roc_auc_score
@@ -52,19 +52,7 @@ import sklearn
 
 
 
-# print(offspring.shape)
+data = [[0.00022313491845782352, 0.005749199752604683], [6.674166785258784e-05, 6.227196060804019e-06], [1.3630289648070004e-05, 1.3753229091314376]]
 
-X, y = make_classification(n_samples=1000, n_features=4,
-                         n_informative=2, n_redundant=0,
-                            random_state=0, shuffle=False)
-
-DataFrame = pd.DataFrame(pd.DataFrame(X))
-DataFrame['class'] = y
-print(DataFrame.shape)
-
-train, test = sklearn.model_selection.train_test_split(DataFrame, test_size=0.2)
-
-
-clf = RandomForestClassifier(max_depth=2, random_state=0).fit(train.iloc[:,:train.shape[1] - 1], train.iloc[:,train.shape[1] - 1])
-
-print(roc_auc_score(test.iloc[:,test.shape[1] - 1], clf.predict_proba(test.iloc[:,:test.shape[1] - 1])[:,1]))
+firsts = [item[0] for item in data]
+print(statistics.median(firsts))
