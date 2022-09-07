@@ -168,10 +168,10 @@ if __name__ == '__main__':
 
 
 
-# fig = plt.figure()
-# plt.plot(fitness)
-# plt.xlabel('Iteration')
-# plt.ylabel('Objective function value')
-# # print('Min objective funtion value')
-# # print('Optimal solution', decoding(bounds, bits_per_var, current_best))
-# plt.show()
+fig = plt.figure()
+plt.plot(fitness)
+plt.xlabel('Iteration')
+plt.ylabel('Objective function value')
+# print('Min objective funtion value')
+# print('Optimal solution', decoding(bounds, bits_per_var, current_best))
+plt.show()

@@ -37,7 +37,7 @@ class Binary_GA:
 # @param crossover_rate is a probability of crossover
 # @param mutation_rate is a mutation rate
 
-    def __init__(self, bounds, iteration, bits_per_var, n_var, pop_size, crossover_rate, mutation_rate):
+    def __init__(self, bounds, iteration, bits_per_var, n_var, pop_size, crossover_rate, mutation_rate, surrogate = None):
         self.bounds = bounds
         self.iteration = iteration
         self.bits_per_var = bits_per_var
@@ -45,6 +45,7 @@ class Binary_GA:
         self.pop_size = pop_size
         self.crossover_rate = crossover_rate
         self.mutation_rate = mutation_rate
+        self.surrogate = surrogate
     
     def objective_function(self, I):
         x = I[0]
@@ -138,23 +139,72 @@ class Binary_GA:
             offspring = self.mutation(pop)
             joint_pop = np.concatenate((pop, offspring))
             real_chromosome = [self.decoding(p) for p in joint_pop]
-            if gen % 5 == 0:
+            if self.surrogate == None:
                 fitness = [self.objective_function(real_values) for real_values in real_chromosome]
-                surrogate_function = RandomForestRegressor(n_estimators = 100, random_state = 0).fit(real_chromosome, fitness)
                 index = np.argmax(fitness)
                 best_solution_encoded.append(real_chromosome[index])
                 best_solution_genotype.append(joint_pop[index])
                 best_fitness.append(1/max(fitness) - 1)
                 pop = self.selection(joint_pop, fitness)
             else:
-                fitness = surrogate_function.predict(real_chromosome)
-                index = np.argmax(fitness)
-                best_solution_encoded.append(real_chromosome[index])
-                best_solution_genotype.append(joint_pop[index])
-                best_fitness.append(1/max(fitness) - 1)
-                pop = self.selection(joint_pop, fitness)
+                if gen % 5 == 0:
+                    fitness = [self.objective_function(real_values) for real_values in real_chromosome]
+                    if self.surrogate == 'RandomForest':
+                        surrogate_function = RandomForestRegressor().fit(real_chromosome, fitness)
+                    if self.surrogate == 'LinearRegression':
+                        surrogate_function = LinearRegression().fit(real_chromosome, fitness)
+                    index = np.argmax(fitness)
+                    best_solution_encoded.append(real_chromosome[index])
+                    best_solution_genotype.append(joint_pop[index])
+                    best_fitness.append(1/max(fitness) - 1)
+                    pop = self.selection(joint_pop, fitness)
+                else:
+                    fitness = surrogate_function.predict(real_chromosome)
+                    index = np.argmax(fitness)
+                    best_solution_encoded.append(real_chromosome[index])
+                    best_solution_genotype.append(joint_pop[index])
+                    best_fitness.append(1/max(fitness) - 1)
+                    pop = self.selection(joint_pop, fitness)
 
-        return best_fitness, best_solution_encoded, best_solution_genotype, surrogate_function
+        if self.surrogate == None:
+            return best_fitness, best_solution_encoded, best_solution_genotype
+        else:
+            return best_fitness, best_solution_encoded, best_solution_genotype, surrogate_function
+        
+    def importance(self, n_explain):
+
+        cumulated_importance = []
+        for _ in range(n_explain):
+            importance = []
+            fitness, phenotype, genotype, surrogate_function = self.solve()    
+            for i in range(self.n_var):
+                pert_solution = genotype[len(fitness)-1].copy()
+                cut_point = randint(bits_per_var*i, bits_per_var*(i+1))
+                if pert_solution[cut_point] == 0:
+                    pert_solution[cut_point] = 1
+                else:
+                    pert_solution[cut_point] = 0
+
+                real_chromosome = []
+
+                for j in range(n_var):
+                    st, end = j*bits_per_var, (j*bits_per_var) + bits_per_var
+                    sub = pert_solution[st:end]
+                    chars = ''.join([str(s) for s in sub])
+                    integer = int(chars, 2)
+                    real_value = bounds[j][0] + (integer/(2**bits_per_var))*(bounds[j][1] - bounds[j][0])
+                    real_chromosome.append(real_value)
+
+                new_fitness = 1/surrogate_function.predict([real_chromosome]) - 1
+                change_i = float(abs(fitness[len(fitness) - 1] - new_fitness))
+                importance.append(change_i)
+
+            cumulated_importance.append(importance)
+        return pert_solution, cumulated_importance
+
+
+
+
 
 
 
@@ -173,44 +223,19 @@ if __name__ == '__main__':
     pop_size = 100
     crossover_rate = 0.7
     mutation_rate = 0.2
-
-    #setup optimization
-
-cumulated_importance = []
-
-for _ in range(50):
-
-    importance = []
-    ga = Binary_GA(bounds, iteration, bits_per_var, n_var, pop_size, crossover_rate, mutation_rate)
-    fitness, phenotype, genotype, surrogate_function = ga.solve()    
-    for i in range(n_var):
-        pert_solution = genotype[len(fitness)-1].copy()
-        cut_point = randint(bits_per_var*i, bits_per_var*(i+1))
-        if pert_solution[cut_point] == 0:
-            pert_solution[cut_point] = 1
-        else:
-            pert_solution[cut_point] = 0
-
-        real_chromosome = []
-
-        for j in range(n_var):
-            st, end = j*bits_per_var, (j*bits_per_var) + bits_per_var
-            sub = pert_solution[st:end]
-            chars = ''.join([str(s) for s in sub])
-            integer = int(chars, 2)
-            real_value = bounds[j][0] + (integer/(2**bits_per_var))*(bounds[j][1] - bounds[j][0])
-            real_chromosome.append(real_value)
-
-        new_fitness = 1/surrogate_function.predict([real_chromosome]) - 1
-        change_i = float(abs(fitness[len(fitness) - 1] - new_fitness))
-        print(change_i)
-        importance.append(change_i)
-
-    cumulated_importance.append(importance)
+    # print('Min objective funtion value')
+    # print('Optimal solution', decoding(bounds, bits_per_var, current_best))
+    ga = Binary_GA(bounds, iteration, bits_per_var, n_var, pop_size, crossover_rate, mutation_rate, surrogate = 'RandomForest')
+    fitness, phenotype, genotype, surrogate = ga.solve()
+    pert_solution, cumulated_importance = ga.importance(n_explain = 3)
+    print(pert_solution)
     print(cumulated_importance)
+    fig = plt.figure()
+    plt.plot(fitness)
+    plt.xlabel('Iteration')
+    plt.ylabel('Objective function value')
+    plt.show()
 
-
-pd.DataFrame(cumulated_importance, columns = ['x1', 'x2']).to_csv('importance.csv')
 
 
 
@@ -225,22 +250,3 @@ pd.DataFrame(cumulated_importance, columns = ['x1', 'x2']).to_csv('importance.cs
 
 
 
-# fig = plt.figure()
-# plt.plot(fitness)
-# plt.xlabel('Iteration')
-# plt.ylabel('Objective function value')
-# # print('Min objective funtion value')
-# # print('Optimal solution', decoding(bounds, bits_per_var, current_best))
-# plt.show()
-
-# X = pd.DataFrame(phenotype, columns=['x1', 'x2'])
-# y = pd.DataFrame(fitness, columns = ['y'])
-# #add constant to predictor variables
-# X = sm.add_constant(X)
-
-# #fit linear regression model
-# model = sm.OLS(y, X).fit()
-# reg = LinearRegression().fit(X, y)
-# #view model summary
-# print(model.summary())
-# print(reg.coef_)
